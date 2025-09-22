@@ -323,30 +323,45 @@ async def borrow(ctx):
         await ctx.send("⚠️ Please tag the lender(s).")
         return
 
+    # Remove mentions and command from content
     content = ctx.message.content
-    # Remove command prefix and mentions
     for user in ctx.message.mentions:
         content = content.replace(f"<@!{user.id}>", "")
+        content = content.replace(f"<@{user.id}>", "")
     content = content.replace("!borrow", "").strip()
 
     if not content:
-        await ctx.send("⚠️ Please specify the cards and quantities to borrow.")
+        await ctx.send("⚠️ Please specify the cards and quantities being borrowed.")
         return
+
+    cards_to_add = parse_cards(content)
 
     for lender in ctx.message.mentions:
         lender_id = str(lender.id)
+        borrower_id = str(ctx.author.id)
+
         if lender_id not in borrowed_data:
             borrowed_data[lender_id] = {}
-        borrower_id = str(ctx.author.id)
         if borrower_id not in borrowed_data[lender_id]:
             borrowed_data[lender_id][borrower_id] = {}
 
-        cards_to_add = parse_cards(content)
+        borrower_cards = borrowed_data[lender_id][borrower_id]
+
+        # Add quantities case-insensitively
         for card_name, qty in cards_to_add.items():
-            borrowed_data[lender_id][borrower_id][card_name] = borrowed_data[lender_id][borrower_id].get(card_name, 0) + qty
+            found = False
+            for stored_card in borrower_cards:
+                if stored_card.lower() == card_name:
+                    borrower_cards[stored_card] += qty
+                    found = True
+                    break
+            if not found:
+                # Keep the original capitalization from the message
+                borrower_cards[card_name] = qty
 
     save_borrowed()
-    await ctx.send(f"✅ Cards recorded for {ctx.author.mention} borrowing from {[user.name for user in ctx.message.mentions]}.")
+    await ctx.send(f"✅ Cards recorded for {ctx.author.mention} borrowing from {[u.name for u in ctx.message.mentions]}.")
+
 
 # Command to subtract returned cards
 @bot.command()
