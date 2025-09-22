@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import json
+import re
 import os
 import random
 from typing import Dict, List, Optional, Tuple
@@ -115,6 +116,30 @@ class DecklistManager:
 
     def get_decklist(self, user_id: str) -> Optional[dict]:
         return self.data.get(user_id)
+    
+# -------------------------------------------------    
+# Load borrowed cards data
+# -------------------------------------------------
+BORROW_FILE = "borrowed_cards.json"
+
+if os.path.exists(BORROW_FILE):
+    with open(BORROW_FILE, "r") as f:
+        borrowed_data = json.load(f)
+else:
+    borrowed_data = {}  # Structure: {lender_id: {borrower_id: {card_name: qty}}}
+
+def save_borrowed():
+    with open(BORROW_FILE, "w") as f:
+        json.dump(borrowed_data, f, indent=4)
+
+def parse_cards(text):
+    """
+    Parse text like '4x Quantum Riddler, 3x Blood Moon' into dict:
+    {'Quantum Riddler': 4, 'Blood Moon': 3}
+    """
+    card_pattern = r'(\d+)x\s+([^,]+)'
+    matches = re.findall(card_pattern, text, re.IGNORECASE)
+    return {name.strip(): int(qty) for qty, name in matches}
 
 
 # -------------------------------------------------
@@ -182,11 +207,12 @@ quotes = QuotePool([
 # Commands
 # -------------------------------------------------
 
+### Hi! ###
 @bot.command()
 async def hello(ctx):
     await ctx.send(f"Hello {ctx.author.mention}! I am Clive, and I am a big dumb idiot.")
 
-
+### League Related Commands ###
 @bot.command()
 async def joinleague(ctx):
     added = league.add_player(str(ctx.author.id))
@@ -246,7 +272,7 @@ async def table(ctx):
         lines.append(f"{i}. {user.name} — {stats['points']} pts")
     await ctx.send("\n".join(lines))
 
-
+### Decklist related commands ###
 @bot.command()
 async def decklist(ctx):
     if ctx.message.mentions:
@@ -270,7 +296,96 @@ async def decklist(ctx):
         decklists.save_decklist(str(ctx.author.id), text, images)
         await ctx.send(f"🗡️ Clive remembers your decklist, {ctx.author.mention}.")
 
+### Borrowing card commands ###
+@bot.command()
+async def borrow(ctx):
+    if not ctx.message.mentions:
+        await ctx.send("⚠️ Please tag the lender(s).")
+        return
 
+    content = ctx.message.content
+    # Remove command prefix and mentions
+    for user in ctx.message.mentions:
+        content = content.replace(f"<@!{user.id}>", "")
+    content = content.replace("!borrow", "").strip()
+
+    if not content:
+        await ctx.send("⚠️ Please specify the cards and quantities to borrow.")
+        return
+
+    for lender in ctx.message.mentions:
+        lender_id = str(lender.id)
+        if lender_id not in borrowed_data:
+            borrowed_data[lender_id] = {}
+        borrower_id = str(ctx.author.id)
+        if borrower_id not in borrowed_data[lender_id]:
+            borrowed_data[lender_id][borrower_id] = {}
+
+        cards_to_add = parse_cards(content)
+        for card_name, qty in cards_to_add.items():
+            borrowed_data[lender_id][borrower_id][card_name] = borrowed_data[lender_id][borrower_id].get(card_name, 0) + qty
+
+    save_borrowed()
+    await ctx.send(f"✅ Cards recorded for {ctx.author.mention} borrowing from {[user.name for user in ctx.message.mentions]}.")
+
+# Command to subtract returned cards
+@bot.command()
+async def returncards(ctx):
+    if not ctx.message.mentions:
+        await ctx.send("⚠️ Please tag the lender(s).")
+        return
+
+    content = ctx.message.content
+    for user in ctx.message.mentions:
+        content = content.replace(f"<@!{user.id}>", "")
+    content = content.replace("!returncards", "").strip()
+
+    if not content:
+        await ctx.send("⚠️ Please specify the cards and quantities being returned.")
+        return
+
+    for lender in ctx.message.mentions:
+        lender_id = str(lender.id)
+        borrower_id = str(ctx.author.id)
+        if lender_id not in borrowed_data or borrower_id not in borrowed_data[lender_id]:
+            await ctx.send(f"⚠️ No records found for {ctx.author.mention} borrowing from {lender.name}.")
+            continue
+
+        cards_to_subtract = parse_cards(content)
+        for card_name, qty in cards_to_subtract.items():
+            if card_name in borrowed_data[lender_id][borrower_id]:
+                borrowed_data[lender_id][borrower_id][card_name] -= qty
+                if borrowed_data[lender_id][borrower_id][card_name] <= 0:
+                    del borrowed_data[lender_id][borrower_id][card_name]
+
+        # Clean up empty borrower lists
+        if not borrowed_data[lender_id][borrower_id]:
+            del borrowed_data[lender_id][borrower_id]
+
+        # Clean up empty lender lists
+        if not borrowed_data[lender_id]:
+            del borrowed_data[lender_id]
+
+    save_borrowed()
+    await ctx.send(f"✅ Cards updated for {ctx.author.mention} returning to {[user.name for user in ctx.message.mentions]}.")
+
+# Command to view borrowed cards
+@bot.command()
+async def borrowed(ctx):
+    lender_id = str(ctx.author.id)
+    if lender_id not in borrowed_data or not borrowed_data[lender_id]:
+        await ctx.send("📭 No borrowed cards recorded for you.")
+        return
+
+    lines = ["📋 **Borrowed Cards:**"]
+    for borrower_id, cards in borrowed_data[lender_id].items():
+        borrower = await bot.fetch_user(int(borrower_id))
+        card_lines = ", ".join(f"{qty}x {name}" for name, qty in cards.items())
+        lines.append(f"- {borrower.name}: {card_lines}")
+
+    await ctx.send("\n".join(lines))
+
+### Fuck Dean lol ###
 @bot.command()
 async def fd(ctx):
     count = dean.increment()
@@ -283,6 +398,7 @@ async def resetfd(ctx):
     await ctx.send("🔄 Dean’s fuck counter has been reset to 0.")
 
 
+### Say something stupid Clive ####
 @bot.command()
 async def quote(ctx):
     await ctx.send(f'🗡️ Clive says: *"{quotes.next()}"*')
