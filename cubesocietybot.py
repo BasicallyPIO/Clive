@@ -363,7 +363,7 @@ async def borrow(ctx):
     await ctx.send(f"✅ Cards recorded for {ctx.author.mention} borrowing from {[u.name for u in ctx.message.mentions]}.")
     
 @bot.command()
-async def mydebt(ctx):
+async def borrowed(ctx):
     """Shows all cards the user owes to other people."""
     borrower_id = str(ctx.author.id)
     lines = []
@@ -434,7 +434,7 @@ async def returncards(ctx):
 
 # Command to view borrowed cards
 @bot.command()
-async def borrowed(ctx):
+async def loaned(ctx):
     lender_id = str(ctx.author.id)
     if lender_id not in borrowed_data or not borrowed_data[lender_id]:
         await ctx.send("📭 No borrowed cards recorded for you.")
