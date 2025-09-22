@@ -44,6 +44,13 @@ class LeagueManager:
         self.data[user_id] = {"points": 0, "opponents": [], "received_bye": False}
         self.save()
         return True
+    
+    def remove_player(self, user_id):
+        if user_id in self.data:
+            del self.data[user_id]
+            self.save()
+            return True
+        return False
 
     def add_points(self, user_id: str, pts: int) -> None:
         if user_id not in self.data:
@@ -187,6 +194,55 @@ async def joinleague(ctx):
         await ctx.send(f"✅ {ctx.author.mention} has joined the league!")
     else:
         await ctx.send(f"{ctx.author.mention}, you’re already in the league!")
+        
+@bot.command()
+async def removeleague(ctx):
+    if not ctx.message.mentions:
+        await ctx.send("⚠️ Please tag at least one user to remove them from the league.")
+        return
+
+    removed, not_found = [], []
+
+    for user in ctx.message.mentions:
+        if LeagueManager.remove_player(str(user.id)):
+            removed.append(user.name)
+        else:
+            not_found.append(user.name)
+
+    response = []
+    if removed:
+        response.append(f"❌ Removed: {', '.join(removed)}")
+    if not_found:
+        response.append(f"ℹ️ Not in league: {', '.join(not_found)}")
+
+    await ctx.send("\n".join(response))
+        
+@bot.command()
+async def removeleague(ctx):
+    if not ctx.message.mentions:
+        await ctx.send("⚠️ Please tag at least one user to remove them from the league.")
+        return
+
+    removed = []
+    not_found = []
+
+    for user in ctx.message.mentions:
+        user_id = str(user.id)
+        if user_id in league:
+            del league[user_id]
+            removed.append(user.name)
+        else:
+            not_found.append(user.name)
+
+    save_league()  # Save changes to the league file
+
+    response = []
+    if removed:
+        response.append(f"❌ Removed: {', '.join(removed)}")
+    if not_found:
+        response.append(f"ℹ️ Not in league: {', '.join(not_found)}")
+
+    await ctx.send("\n".join(response))
 
 
 @bot.command()
