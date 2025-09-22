@@ -216,34 +216,6 @@ async def removeleague(ctx):
         response.append(f"ℹ️ Not in league: {', '.join(not_found)}")
 
     await ctx.send("\n".join(response))
-        
-@bot.command()
-async def removeleague(ctx):
-    if not ctx.message.mentions:
-        await ctx.send("⚠️ Please tag at least one user to remove them from the league.")
-        return
-
-    removed = []
-    not_found = []
-
-    for user in ctx.message.mentions:
-        user_id = str(user.id)
-        if user_id in league:
-            del league[user_id]
-            removed.append(user.name)
-        else:
-            not_found.append(user.name)
-
-    save_league()  # Save changes to the league file
-
-    response = []
-    if removed:
-        response.append(f"❌ Removed: {', '.join(removed)}")
-    if not_found:
-        response.append(f"ℹ️ Not in league: {', '.join(not_found)}")
-
-    await ctx.send("\n".join(response))
-
 
 @bot.command()
 async def pairings(ctx):
