@@ -139,19 +139,22 @@ def parse_cards(message: str) -> dict:
       - 2x Quantum Riddler
       - 2 Quantum Riddler
       - Multiple cards separated by commas or 'and'
-    Normalizes card names to lowercase for case-insensitivity.
+    Case-insensitive, returns card names in lowercase for normalization.
     """
     cards = {}
-    # Normalize separators
-    message = message.replace(" and ", ", ")
+    
+    # Normalize separators: commas and 'and'
+    message = re.sub(r'\s+and\s+', ',', message, flags=re.IGNORECASE)
+    
+    # Split by comma
     entries = [e.strip() for e in message.split(",") if e.strip()]
-
+    
     for entry in entries:
         # Match optional 'x' after number
         match = re.match(r"(\d+)\s*x?\s*(.+)", entry, re.IGNORECASE)
         if match:
             qty = int(match.group(1))
-            card_name = match.group(2).strip().lower()  # lowercase for normalization
+            card_name = match.group(2).strip().lower()  # normalize
             if card_name in cards:
                 cards[card_name] += qty
             else:
@@ -352,17 +355,18 @@ async def returncards(ctx):
         await ctx.send("⚠️ Please tag the lender(s).")
         return
 
-    # Remove command and mentions from message content
+    # Remove mentions and command
     content = ctx.message.content
     for user in ctx.message.mentions:
         content = content.replace(f"<@!{user.id}>", "")
+        content = content.replace(f"<@{user.id}>", "")
     content = content.replace("!returncards", "").strip()
 
     if not content:
         await ctx.send("⚠️ Please specify the cards and quantities being returned.")
         return
 
-    cards_to_subtract = parse_cards(content)  # normalized to lowercase
+    cards_to_subtract = parse_cards(content)
 
     for lender in ctx.message.mentions:
         lender_id = str(lender.id)
@@ -372,27 +376,25 @@ async def returncards(ctx):
             await ctx.send(f"⚠️ No records found for {ctx.author.mention} borrowing from {lender.name}.")
             continue
 
-        # Iterate over a copy of keys to avoid issues when deleting
         borrower_cards = borrowed_data[lender_id][borrower_id]
-        for card_name, qty in cards_to_subtract.items():
-            # Find matching key in borrower's data (case-insensitive)
-            for borrowed_card in list(borrower_cards.keys()):
-                if borrowed_card.lower() == card_name:
-                    borrower_cards[borrowed_card] -= qty
-                    if borrower_cards[borrowed_card] <= 0:
-                        del borrower_cards[borrowed_card]
-                    break  # Stop searching once matched
 
-        # Clean up empty borrower lists
-        if not borrowed_data[lender_id][borrower_id]:
+        # Subtract quantities case-insensitively
+        for card_name, qty in cards_to_subtract.items():
+            for stored_card in list(borrower_cards.keys()):
+                if stored_card.lower() == card_name:
+                    borrower_cards[stored_card] -= qty
+                    if borrower_cards[stored_card] <= 0:
+                        del borrower_cards[stored_card]
+                    break
+
+        # Clean up empty borrower/lender entries
+        if not borrower_cards:
             del borrowed_data[lender_id][borrower_id]
-        # Clean up empty lender lists
         if not borrowed_data[lender_id]:
             del borrowed_data[lender_id]
 
     save_borrowed()
-    await ctx.send(f"✅ Cards updated for {ctx.author.mention} returning to {[user.name for user in ctx.message.mentions]}.")
-
+    await ctx.send(f"✅ Cards updated for {ctx.author.mention} returning to {[u.name for u in ctx.message.mentions]}.")
 
 
 # Command to view borrowed cards
