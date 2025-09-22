@@ -361,6 +361,26 @@ async def borrow(ctx):
 
     save_borrowed()
     await ctx.send(f"✅ Cards recorded for {ctx.author.mention} borrowing from {[u.name for u in ctx.message.mentions]}.")
+    
+@bot.command()
+async def mydebt(ctx):
+    """Shows all cards the user owes to other people."""
+    borrower_id = str(ctx.author.id)
+    lines = []
+
+    # Iterate over all lenders
+    for lender_id, lenders_borrowers in borrowed_data.items():
+        if borrower_id in lenders_borrowers:
+            lender = await bot.fetch_user(int(lender_id))
+            borrower_cards = lenders_borrowers[borrower_id]
+
+            card_list = [f"{qty}x {card}" for card, qty in borrower_cards.items()]
+            lines.append(f"💰 Owed to {lender.name}: {', '.join(card_list)}")
+
+    if not lines:
+        await ctx.send("✅ You currently owe no cards to anyone.")
+    else:
+        await ctx.send("\n".join(lines))
 
 
 # Command to subtract returned cards
