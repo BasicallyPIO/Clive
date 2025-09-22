@@ -362,7 +362,7 @@ async def returncards(ctx):
         await ctx.send("⚠️ Please specify the cards and quantities being returned.")
         return
 
-    cards_to_subtract = parse_cards(content)
+    cards_to_subtract = parse_cards(content)  # normalized to lowercase
 
     for lender in ctx.message.mentions:
         lender_id = str(lender.id)
@@ -372,28 +372,27 @@ async def returncards(ctx):
             await ctx.send(f"⚠️ No records found for {ctx.author.mention} borrowing from {lender.name}.")
             continue
 
-        # Normalize borrowed_data keys for case-insensitive comparison
-        normalized_borrowed = {k.lower(): v for k, v in borrowed_data[lender_id][borrower_id].items()}
-
+        # Iterate over a copy of keys to avoid issues when deleting
+        borrower_cards = borrowed_data[lender_id][borrower_id]
         for card_name, qty in cards_to_subtract.items():
-            if card_name in normalized_borrowed:
-                normalized_borrowed[card_name] -= qty
-                if normalized_borrowed[card_name] <= 0:
-                    del normalized_borrowed[card_name]
-
-        # Replace original borrower data with normalized
-        borrowed_data[lender_id][borrower_id] = normalized_borrowed
+            # Find matching key in borrower's data (case-insensitive)
+            for borrowed_card in list(borrower_cards.keys()):
+                if borrowed_card.lower() == card_name:
+                    borrower_cards[borrowed_card] -= qty
+                    if borrower_cards[borrowed_card] <= 0:
+                        del borrower_cards[borrowed_card]
+                    break  # Stop searching once matched
 
         # Clean up empty borrower lists
         if not borrowed_data[lender_id][borrower_id]:
             del borrowed_data[lender_id][borrower_id]
-
         # Clean up empty lender lists
         if not borrowed_data[lender_id]:
             del borrowed_data[lender_id]
 
     save_borrowed()
     await ctx.send(f"✅ Cards updated for {ctx.author.mention} returning to {[user.name for user in ctx.message.mentions]}.")
+
 
 
 # Command to view borrowed cards
