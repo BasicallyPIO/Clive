@@ -132,14 +132,32 @@ def save_borrowed():
     with open(BORROW_FILE, "w") as f:
         json.dump(borrowed_data, f, indent=4)
 
-def parse_cards(text):
+def parse_cards(message: str) -> dict:
     """
-    Parse text like '4x Quantum Riddler, 3x Blood Moon' into dict:
-    {'Quantum Riddler': 4, 'Blood Moon': 3}
+    Parses a string of cards into a dictionary: {"Card Name": quantity, ...}
+    Accepts formats like:
+      - 2x Quantum Riddler
+      - 2 Quantum Riddler
+      - Multiple cards separated by commas or 'and'
     """
-    card_pattern = r'(\d+)x\s+([^,]+)'
-    matches = re.findall(card_pattern, text, re.IGNORECASE)
-    return {name.strip(): int(qty) for qty, name in matches}
+    cards = {}
+    # Normalize separators
+    message = message.replace(" and ", ", ")
+    entries = [e.strip() for e in message.split(",") if e.strip()]
+
+    for entry in entries:
+        # Match optional 'x' after number
+        match = re.match(r"(\d+)\s*x?\s*(.+)", entry, re.IGNORECASE)
+        if match:
+            qty = int(match.group(1))
+            card_name = match.group(2).strip()
+            # Combine quantities if card already exists in message
+            if card_name in cards:
+                cards[card_name] += qty
+            else:
+                cards[card_name] = qty
+
+    return cards
 
 
 # -------------------------------------------------
