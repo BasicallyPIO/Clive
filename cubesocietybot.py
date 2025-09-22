@@ -204,7 +204,7 @@ async def removeleague(ctx):
     removed, not_found = [], []
 
     for user in ctx.message.mentions:
-        if LeagueManager.remove_player(str(user.id)):
+        if league.remove_player(str(user.id)):
             removed.append(user.name)
         else:
             not_found.append(user.name)
