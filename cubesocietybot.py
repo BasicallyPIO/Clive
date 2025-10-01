@@ -318,7 +318,7 @@ async def on_message(message):
 
             await message.channel.send(
                 f"🏆 {mentioned_user.mention} gains 3 points! "
-                f"(Total: {league[user_id]['points']} pts)"
+                f"(Total: {league.data[user_id]['points']} pts)"
             )
 
     # Keep processing other commands after checking
