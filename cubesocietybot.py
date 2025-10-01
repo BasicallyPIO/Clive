@@ -482,6 +482,76 @@ async def returncards(ctx):
 
     save_borrowed()
     await ctx.send(f"✅ Cards updated for {ctx.author.mention} returning to {[u.name for u in ctx.message.mentions]}.")
+    
+@bot.command()
+async def returncardstome(ctx):
+    """
+    Remove cards that someone has borrowed from you.
+    Usage: !returncardstome @User 2 Black Lotus, 3 Mountain
+    """
+    if not ctx.message.mentions:
+        await ctx.send("⚠️ Please tag the person returning cards.")
+        return
+
+    borrower = ctx.message.mentions[0]
+    borrower_id = str(borrower.id)
+    lender_id = str(ctx.author.id)
+
+    if borrower_id not in borrowed_cards or lender_id not in borrowed_cards[borrower_id]:
+        await ctx.send(f"ℹ️ {borrower.display_name} has no borrowed cards recorded from you.")
+        return
+
+    # Extract card returns from the message
+    content = ctx.message.content
+    # Remove the command and mention from content
+    for mention in ctx.message.mentions:
+        content = content.replace(f"<@{mention.id}>", "")
+    content = content.replace("!returncardstome", "").strip()
+
+    # Split multiple cards by comma
+    card_entries = [c.strip() for c in content.split(",") if c.strip()]
+
+    returned = []
+    not_found = []
+
+    for entry in card_entries:
+        # Accept both "2x Card Name" and "2 Card Name"
+        parts = entry.split(maxsplit=1)
+        if len(parts) < 2:
+            continue
+        try:
+            quantity = int(parts[0].replace("x", ""))
+            card_name = parts[1].strip().lower()
+        except ValueError:
+            continue
+
+        borrower_cards = borrowed_cards[borrower_id][lender_id]
+        if card_name in borrower_cards:
+            borrower_cards[card_name] -= quantity
+            if borrower_cards[card_name] <= 0:
+                del borrower_cards[card_name]
+            returned.append(f"{quantity} {card_name}")
+        else:
+            not_found.append(card_name)
+
+    # Cleanup if empty
+    if not borrowed_cards[borrower_id][lender_id]:
+        del borrowed_cards[borrower_id][lender_id]
+    if not borrowed_cards[borrower_id]:
+        del borrowed_cards[borrower_id]
+
+    # Save to disk
+    with open("borrowed_cards.json", "w") as f:
+        json.dump(borrowed_cards, f, indent=4)
+
+    # Build response
+    response = []
+    if returned:
+        response.append(f"✅ Removed: {', '.join(returned)} from {borrower.display_name}'s borrowed list.")
+    if not_found:
+        response.append(f"ℹ️ Not found in {borrower.display_name}'s borrowed list: {', '.join(not_found)}")
+
+    await ctx.send("\n".join(response))
 
 
 # Command to view borrowed cards
