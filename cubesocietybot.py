@@ -291,6 +291,38 @@ async def table(ctx):
         user = await bot.fetch_user(int(uid))
         lines.append(f"{i}. {user.name} — {stats['points']} pts")
     await ctx.send("\n".join(lines))
+    
+@bot.event
+async def on_message(message):
+    if message.author == bot.user:  # Ignore Clive's own messages
+        return
+
+    # Check for mentions and make sure there's exactly one
+    if message.mentions and len(message.mentions) == 1:
+        mentioned_user = message.mentions[0]
+        user_id = str(mentioned_user.id)
+
+        # Expected exact message format: "<@id> wins"
+        expected_texts = [
+            f"<@{user_id}> wins",
+            f"<@!{user_id}> wins"  # Discord sometimes inserts "!" for nicknames
+        ]
+
+        if message.content.strip().lower() in [t.lower() for t in expected_texts]:
+            # Ensure user exists in league
+            if user_id not in league:
+                league[user_id] = {"points": 0}
+
+            league[user_id]["points"] += 3
+            save_league()
+
+            await message.channel.send(
+                f"🏆 {mentioned_user.mention} gains 3 points! "
+                f"(Total: {league[user_id]['points']} pts)"
+            )
+
+    # Keep processing other commands after checking
+    await bot.process_commands(message)
 
 ### Decklist related commands ###
 @bot.command()
