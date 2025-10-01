@@ -310,11 +310,11 @@ async def on_message(message):
 
         if message.content.strip().lower() in [t.lower() for t in expected_texts]:
             # Ensure user exists in league
-            if user_id not in league:
-                league[user_id] = {"points": 0}
+            if user_id not in league.data:
+                league.data[user_id] = {"points": 0}
 
-            league[user_id]["points"] += 3
-            save_league()
+            league.data[user_id]["points"] += 3
+            league.save()
 
             await message.channel.send(
                 f"🏆 {mentioned_user.mention} gains 3 points! "
