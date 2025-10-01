@@ -292,6 +292,10 @@ async def table(ctx):
         lines.append(f"{i}. {user.name} — {stats['points']} pts")
     await ctx.send("\n".join(lines))
     
+################################################
+#    WINS AND SUBTRACTION LOGIC
+################################################
+    
 @bot.event
 async def on_message(message):
     if message.author == bot.user:  # Ignore Clive's own messages
@@ -323,6 +327,22 @@ async def on_message(message):
 
     # Keep processing other commands after checking
     await bot.process_commands(message)
+    
+@bot.command()
+async def removepoints(ctx, member: discord.Member, points: int):
+    """Subtract points from a player's league score."""
+    user_id = str(member.id)
+
+    if user_id not in league.data:
+        await ctx.send(f"⚠️ {member.display_name} is not in the league.")
+        return
+
+    # Subtract points
+    league.data[user_id]["points"] = max(0, league.data[user_id]["points"] - points)
+    league.save()
+
+    await ctx.send(f"📉 Removed {points} points from {member.display_name}. "
+                   f"New total: {league.data[user_id]['points']}")
 
 ### Decklist related commands ###
 @bot.command()
